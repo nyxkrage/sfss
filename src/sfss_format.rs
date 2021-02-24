@@ -7,7 +7,7 @@ use std::io::ErrorKind as IoErrorKind;
 use std::io::Result as IoResult;
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 
-const MAGIC_BYTES: [u8; 6] = [ 53, 46, 53, 53, 253, 254];
+const MAGIC_BYTES: [u8; 6] = [53, 46, 53, 53, 253, 254];
 
 // FILE STRUCTURE:
 // 6 bytes: MAGIC DATA [35 2E 35 35 FD FE]
@@ -186,8 +186,9 @@ impl SfssFile {
         if self.password == None {
             self.password = passwords::PasswordGenerator::new()
                 .uppercase_letters(true)
-                .generate_one().ok();
-                true
+                .generate_one()
+                .ok();
+            true
         } else {
             false
         }
@@ -358,7 +359,7 @@ impl Write for SfssFile {
                 }
             }
             if tmp_buf == MAGIC_BYTES {
-                return Err(IoError::from(IoErrorKind::AlreadyExists))
+                return Err(IoError::from(IoErrorKind::AlreadyExists));
             }
             fd.seek(SeekFrom::Start(0)).unwrap();
             fd.set_len(0).unwrap();
@@ -383,7 +384,11 @@ impl Read for SfssFile {
 }
 
 use rocket::response::Result as responseResult;
-use rocket::{http::Status, response::Responder, Request, Response};
+use rocket::{
+    http::{Header, Status},
+    response::Responder,
+    Request, Response,
+};
 
 impl<'r> Responder<'r, 'static> for SfssFile {
     fn respond_to(self, _: &'r Request<'_>) -> responseResult<'static> {
@@ -391,6 +396,18 @@ impl<'r> Responder<'r, 'static> for SfssFile {
             .header(self.content_type())
             .status(Status::Ok)
             .sized_body(self.buf.len(), Cursor::new(self.buf))
+            .header(Header::new(
+                "Content-Disposition",
+                format!(
+                    "{}; filename=\"{}\"",
+                    if self.flags.no_preview {
+                        "attachment"
+                    } else {
+                        "inline"
+                    },
+                    self.filename
+                ),
+            ))
             .ok()
     }
 }
@@ -438,7 +455,8 @@ impl FromData for SfssFile {
                 std::io::copy(&mut entry.data, &mut sfss_file).unwrap();
             }
             _ => (),
-        }).expect("Unable to iterate");
+        })
+        .expect("Unable to iterate");
 
         if let Err(err) = sfss_file.flush() {
             if err.kind() == IoErrorKind::AlreadyExists {

@@ -40,7 +40,11 @@ lazy_static::lazy_static! {
 
 #[post("/upload", data = "<data>")]
 async fn upload(data: SfssFile) -> Result<Html<String>, Status> {
-    let template = if data.password.is_some() { sfss_templates::UPLOAD_PASSWORD } else { sfss_templates::UPLOAD };
+    let template = if data.password.is_some() {
+        sfss_templates::UPLOAD_PASSWORD
+    } else {
+        sfss_templates::UPLOAD
+    };
     let ctx = Context {
         code: data.hash, //sfss_file.hash,
         url: APP_CONTEXT.url.clone(),
