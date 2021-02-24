@@ -1,0 +1,15 @@
+version: '3.3'
+services:
+    sfss:
+        ports:
+            - '8000:8000'
+        volumes:
+            - '/var/sfss:/var/sfss'
+        environment:
+            - 'ROCKET_ADDRESS=0.0.0.0'
+            - 'SFSS_LOCATION=/var/sfss'
+            - 'SFSS_TITLE=NyxShare'
+            - 'SFSS_LABEL=Choose file...'
+            - 'SFSS_ROOT='
+            - 'SFSS_URL=https://share.nyx.xyz/'
+        image: sfss

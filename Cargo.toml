@@ -1,0 +1,23 @@
+[package]
+name = "sfss"
+version = "2.0.0"
+authors = ["Carsten Kragelund <carsten@kragelund.dev>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rocket = { git = "https://github.com/SergioBenitez/Rocket", rev = "73037c662015c21ac5c32ac5d6de166b8b91edce"  }
+serde = { version = "1.0", features = ["derive"] }
+base-62 = "0.1.1"
+flate2 = { version = "1.0", features = ["zlib-ng-compat"], default-features = false }
+lazy_static = "1.4.0"
+dotenv = "0.15.0"
+passwords = "3.1.3"
+xxhrs = "2.0.0"
+byteorder = "1.4.2"
+handlebars = "3.5.3"
+multipart = { version = "0.17.1", default-features = false, features = ["server"] }
+
+[dev-dependencies]
+tempdir = "0.3.7"
