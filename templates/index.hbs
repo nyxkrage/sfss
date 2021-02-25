@@ -8,6 +8,7 @@
 	</head>
 	<body>
 		<form action="{{webroot}}/upload" method="post" enctype="multipart/form-data">
+            <textarea maxlength="128000000" cols="120" rows="14" name="file" placeholder="Enter text to upload here"></textarea><br />
 			<label for="file">{{label}}</label><br />
 			<input type="file" name="file" id="file" /><br />
 			<input type="checkbox" name="public" checked />

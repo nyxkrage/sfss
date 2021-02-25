@@ -307,15 +307,12 @@ impl SfssFile {
         if true == self.compressed {
             return Err(IoError::from(IoErrorKind::InvalidData));
         }
-        let mut buf: &[u8] = &Vec::new();
 
-        let mut encoder =
-            flate2::write::ZlibEncoder::new(&mut self.buf, flate2::Compression::fast());
-
-        std::io::copy(&mut buf, &mut encoder)?;
-        let size = encoder.total_out();
-        encoder.finish().unwrap();
-
+        let mut e = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::fast());
+        e.write_all(&self.buf).unwrap();
+        let size = e.total_out();
+        self.buf = e.finish().unwrap();
+        
         self.compressed = true;
         Ok(size)
     }
@@ -324,12 +321,12 @@ impl SfssFile {
         if false == self.compressed {
             return Err(IoError::from(IoErrorKind::InvalidData));
         }
-        let mut buf: Vec<u8> = Vec::new();
+        let mut d = flate2::read::ZlibDecoder::new(&self.buf[..]);
+        let mut buf = Vec::new();
+        d.read_to_end(&mut buf).unwrap();
 
-        let mut decoder = flate2::read::ZlibDecoder::new(&self.buf[..]);
-        std::io::copy(&mut decoder, &mut buf)?;
-        let size = decoder.total_out();
-        drop(decoder);
+        let size = d.total_out();
+        self.buf.clear();
         std::io::copy(&mut &buf[..], &mut self.buf)?;
 
         self.compressed = false;
@@ -437,6 +434,7 @@ impl FromData for SfssFile {
 
         let mut mp = Multipart::with_body(Cursor::new(d), boundary);
         let mut sfss_file = SfssFile::create("".into(), false, false, false);
+        let mut written = false;
 
         // Custom implementation parts
         mp.foreach_entry(|mut entry| match &*entry.headers.name {
@@ -451,8 +449,14 @@ impl FromData for SfssFile {
                 sfss_file.flags.no_preview = true;
             }
             "file" => {
-                sfss_file.filename = entry.headers.filename.unwrap();
-                std::io::copy(&mut entry.data, &mut sfss_file).unwrap();
+                if  false == written
+                    || (false == entry.is_text() && Some("".into()) != entry.headers.filename)
+                {
+                    sfss_file.buf.clear();
+                    written = 0 != std::io::copy(&mut entry.data, &mut sfss_file).unwrap();
+                    dbg!(&sfss_file.buf);
+                    sfss_file.filename = entry.headers.filename.unwrap_or("untitled.txt".into());
+                }
             }
             _ => (),
         })
@@ -473,6 +477,7 @@ impl FromData for SfssFile {
 
                 sfss_file.force_write().unwrap();
             } else {
+                dbg!(err);
                 panic!();
             }
         }
@@ -488,7 +493,7 @@ mod tests {
     fn write_and_read_full() {
         use std::io::Write;
 
-        let content = "This is some plain text".as_bytes().to_vec();
+        let content = "File write and read test".as_bytes().to_vec();
         let filename = "test.txt".to_string();
         let tmp_dir = tempdir::TempDir::new("sfss").unwrap();
         std::env::set_var("SFSS_LOCATION", tmp_dir.path());
@@ -502,5 +507,44 @@ mod tests {
         let output = super::SfssFile::new(input.hash.clone(), false).unwrap();
 
         assert_eq!(input, output);
+    }
+
+    #[test]
+    fn file_compress_decompress() {
+        use std::io::Write;
+
+        let content = b"File Compression and decompression test";
+        let filename = "".to_string();
+        let tmp_dir = tempdir::TempDir::new("sfss").unwrap();
+        std::env::set_var("SFSS_LOCATION", tmp_dir.path());
+        dbg!(std::env::var("SFSS_LOCATION").unwrap());
+        let mut input = super::SfssFile::create(filename.clone(), true, true, false);
+
+        input.write_all(content).unwrap();
+        assert_eq!(input.buf, content);
+        input.flush().unwrap();
+
+        input.decompress().unwrap();
+        assert_eq!(input.buf, content)
+    }
+
+    #[test]
+    fn compress_and_decompress() {
+        use flate2::write::ZlibEncoder;
+        use flate2::Compression;
+        use flate2::read::ZlibDecoder;
+        use std::io::Write;
+        use std::io::Read;
+
+        let content = "This is some plain text".as_bytes().to_vec();
+        let mut e = ZlibEncoder::new(Vec::new(), Compression::default());
+        e.write_all(&content).unwrap();
+        let compressed = e.finish().unwrap();
+
+        let mut z = ZlibDecoder::new(&compressed[..]);
+        let mut b = Vec::new();
+        z.read_to_end(&mut b).unwrap();
+
+        assert_eq!(content, b);
     }
 }
