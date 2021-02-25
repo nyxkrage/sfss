@@ -60,19 +60,28 @@ async fn upload(data: SfssFile) -> Result<Html<String>, Status> {
     }
 }
 
-/*
 #[post("/upload/api", data = "<data>")]
-fn api_upload(content_type: &ContentType, data: Data) -> Result<Template, Status> {
-    let ctx = Context {
-        code: "".into(), //xxhash_file(&tmp_path2),
-        url: APP_CONTEXT.url.to_string(),
-        webroot: APP_CONTEXT.webroot.to_string(),
+fn api_upload(data: SfssFile) -> Result<String, Status> {
+    let template = if data.password.is_some() {
+        sfss_templates::UPLOAD_API_PASSWORD
+    } else {
+        sfss_templates::UPLOAD_API
     };
-    std::fs::copy(tmp_path2, Path::new("/var/www/uploads").join(&ctx.code)).unwrap();
-    Ok(Template::render("upload_api", &ctx))
+    let ctx = Context {
+        code: data.hash, //sfss_file.hash,
+        url: APP_CONTEXT.url.clone(),
+        webroot: APP_CONTEXT.webroot.clone(),
+        password: data.password,
+    };
+    match handlebars::Handlebars::new().render_template(template, &ctx) {
+        Ok(v) => Ok(v),
+        Err(e) => {
+            eprintln!("{:?}", e);
+            Err(Status::InternalServerError)
+        }
+    }
 }
 
-*/
 #[get("/<code>?<password>")]
 fn file(code: String, password: Option<String>) -> Result<SfssFile, Status> {
     match SfssFile::new(code.clone(), false) {
@@ -107,8 +116,9 @@ fn favicon() -> Status {
     Status::NotFound
 }
 
+// The launch attribute, tells that this is the entry point for the application
 #[launch]
 async fn rocket() -> rocket::Rocket {
     dotenv::dotenv().ok();
-    rocket::ignite().mount("/", routes![file, upload, /*api_upload,*/ root, favicon])
+    rocket::ignite().mount("/", routes![file, upload, api_upload, root, favicon])
 }
