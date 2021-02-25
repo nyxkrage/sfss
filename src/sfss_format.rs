@@ -388,7 +388,8 @@ use rocket::{
 };
 
 impl<'r> Responder<'r, 'static> for SfssFile {
-    fn respond_to(self, _: &'r Request<'_>) -> responseResult<'static> {
+    fn respond_to(mut self, _: &'r Request<'_>) -> responseResult<'static> {
+        self.decompress().unwrap();
         Response::build()
             .header(self.content_type())
             .status(Status::Ok)
