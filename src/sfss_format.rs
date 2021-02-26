@@ -221,7 +221,7 @@ impl SfssFile {
 
     pub fn create(filename: String, public: bool, protected: bool, no_preview: bool) -> Self {
         SfssFile {
-            filename: filename,
+            filename,
             hash: String::default(),
             filetype: FileType::Text, // TODO: Change to check magic bytes of input
             file: std::path::PathBuf::from(std::env::var("SFSS_LOCATION").unwrap()),
@@ -453,9 +453,14 @@ impl FromData for SfssFile {
                 if  false == written
                     || (false == entry.is_text() && Some("".into()) != entry.headers.filename)
                 {
+                    if entry.is_text() {
+                        sfss_file.filetype = FileType::Text;
+                    } else {
+                        sfss_file.filetype = FileType::Binary(BinaryType::Previewable);
+
+                    }
                     sfss_file.buf.clear();
                     written = 0 != std::io::copy(&mut entry.data, &mut sfss_file).unwrap();
-                    dbg!(&sfss_file.buf);
                     sfss_file.filename = entry.headers.filename.unwrap_or("untitled.txt".into());
                 }
             }
