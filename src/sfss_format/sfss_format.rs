@@ -1,3 +1,5 @@
+use crate::sfss_format::filetype::{FileType, BinaryType};
+
 use core::panic;
 use std::{fs::File, io::Cursor};
 
@@ -33,59 +35,6 @@ fn u8_to_bools(byte: u8) -> [bool; 8] {
         *b = byte & 1 << (7 - i) != 0;
     }
     res
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum FileType {
-    Text,
-    Binary(BinaryType),
-    // The string is for specifying the language, to be used for syntax highlighting
-    Code(String),
-}
-impl Default for FileType {
-    fn default() -> Self {
-        FileType::Text
-    }
-}
-
-impl FileType {
-    fn as_bytes(&self) -> [u8; 4] {
-        match self {
-            Self::Text => [0, 0, 0, 0],
-            Self::Binary(b) => match b {
-                BinaryType::Previewable => [1, 0, 0, 0],
-                BinaryType::NonPreviewable => [1, 0, 0, 1],
-            },
-            Self::Code(c) => {
-                if c.len() > 3 {
-                    return [2, 0, 0, 0];
-                }
-                let mut res = [2, 0, 0, 0];
-                for (i, b) in c.as_bytes().iter().enumerate() {
-                    // This wont fail, as we gaurentee that the length of the string is less than 3.
-                    res[i + 4 - c.len()] = *b;
-                }
-                res
-            }
-        }
-    }
-
-    fn from_bytes(b: [u8; 4]) -> Self {
-        match b[0] {
-            2 => Self::Code(String::from_utf8(b[1..].to_vec()).unwrap_or("".to_string())),
-            1 => match b[3] {
-                0 => Self::Binary(BinaryType::Previewable),
-                1 | _ => Self::Binary(BinaryType::NonPreviewable),
-            },
-            0 | _ => Self::Text,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum BinaryType {
-    Previewable,
-    NonPreviewable,
 }
 
 use serde::{Deserialize, Serialize};
@@ -154,7 +103,7 @@ impl SfssFile {
     fn content_type(&self) -> ContentType {
         match self.filetype {
             FileType::Text => ContentType::Plain,
-            FileType::Code(_) => ContentType::Plain,
+            FileType::Code(_) => ContentType::HTML,
             FileType::Binary(BinaryType::Previewable) => {
                 ContentType::from_extension(self.filename.rsplit('.').nth(0).unwrap())
                     .unwrap_or(ContentType::Binary)
@@ -312,7 +261,7 @@ impl SfssFile {
         e.write_all(&self.buf).unwrap();
         let size = e.total_out();
         self.buf = e.finish().unwrap();
-        
+
         self.compressed = true;
         Ok(size)
     }
@@ -387,26 +336,63 @@ use rocket::{
     Request, Response,
 };
 
+#[derive(Serialize)]
+struct CodeContext {
+    hljsclass: &'static str,
+    content: String,
+}
+
 impl<'r> Responder<'r, 'static> for SfssFile {
     fn respond_to(mut self, _: &'r Request<'_>) -> responseResult<'static> {
         self.decompress().unwrap();
-        Response::build()
-            .header(self.content_type())
-            .status(Status::Ok)
-            .sized_body(self.buf.len(), Cursor::new(self.buf))
-            .header(Header::new(
-                "Content-Disposition",
-                format!(
-                    "{}; filename=\"{}\"",
-                    if self.flags.no_preview {
-                        "attachment"
-                    } else {
-                        "inline"
-                    },
-                    self.filename
-                ),
-            ))
-            .ok()
+        // This can likely be reduced by a ton
+        if let FileType::Code(id) = self.filetype {
+            let content = String::from_utf8_lossy(&self.buf);
+            let ctx = CodeContext {
+                hljsclass: highlightjs::from_id(id as usize).unwrap(),
+                content: content.to_string(),
+            };
+            if let Ok(v) = handlebars::Handlebars::new().render_template(crate::sfss_templates::CODE, &ctx) {
+                Response::build()
+                    .header(self.content_type())
+                    .sized_body(v.len(), Cursor::new(v))
+                    .header(Header::new("Cache-Control", "max-age=31536000"))
+                    .header(Header::new(
+                        "Content-Disposition",
+                        format!(
+                            "{}; filename=\"{}\"",
+                            if self.flags.no_preview {
+                                "attachment"
+                            } else {
+                                "inline"
+                            },
+                            self.filename
+                        )
+                    ))
+                    .ok()
+            } else {
+                Response::build().status(Status::InternalServerError).ok()
+            }
+        } else {
+            Response::build()
+                .header(self.content_type())
+                .status(Status::Ok)
+                .sized_body(self.buf.len(), Cursor::new(self.buf))
+                .header(Header::new("Cache-Control", "max-age=31536000"))
+                .header(Header::new(
+                    "Content-Disposition",
+                    format!(
+                        "{}; filename=\"{}\"",
+                        if self.flags.no_preview {
+                            "attachment"
+                        } else {
+                            "inline"
+                        },
+                        self.filename
+                    ),
+                ))
+                .ok()
+        }
     }
 }
 
@@ -437,8 +423,25 @@ impl FromData for SfssFile {
         let mut sfss_file = SfssFile::create("".into(), false, false, false);
         let mut written = false;
 
+        use highlightjs::{exact, to_id};
+        let mut langid = None;
+        
         // Custom implementation parts
         mp.foreach_entry(|mut entry| match &*entry.headers.name {
+            "language" => {
+                let mut s = String::new();
+                dbg!(&entry.is_text());
+                if entry.is_text() {
+                    entry.data.read_to_string(&mut s).unwrap();
+                    dbg!(&s);
+                    if let Some(m) = exact(&s) {
+                        dbg!(&m);
+                        if m != "plaintext" {
+                            langid =to_id(m);
+                        }
+                    }
+                }
+            }
             "public" => {
                 sfss_file.flags.public = true;
             }
@@ -450,14 +453,13 @@ impl FromData for SfssFile {
                 sfss_file.flags.no_preview = true;
             }
             "file" => {
-                if  false == written
+                if false == written
                     || (false == entry.is_text() && Some("".into()) != entry.headers.filename)
                 {
                     if entry.is_text() {
                         sfss_file.filetype = FileType::Text;
                     } else {
                         sfss_file.filetype = FileType::Binary(BinaryType::Previewable);
-
                     }
                     sfss_file.buf.clear();
                     written = 0 != std::io::copy(&mut entry.data, &mut sfss_file).unwrap();
@@ -467,6 +469,13 @@ impl FromData for SfssFile {
             _ => (),
         })
         .expect("Unable to iterate");
+         
+        dbg!(&langid);
+        if let Some(id) = langid {
+            if sfss_file.filetype == FileType::Text {
+                sfss_file.filetype = FileType::Code(id as u32);
+            }
+        };
 
         if let Err(err) = sfss_file.flush() {
             if err.kind() == IoErrorKind::AlreadyExists {
@@ -536,11 +545,11 @@ mod tests {
 
     #[test]
     fn compress_and_decompress() {
+        use flate2::read::ZlibDecoder;
         use flate2::write::ZlibEncoder;
         use flate2::Compression;
-        use flate2::read::ZlibDecoder;
-        use std::io::Write;
         use std::io::Read;
+        use std::io::Write;
 
         let content = "This is some plain text".as_bytes().to_vec();
         let mut e = ZlibEncoder::new(Vec::new(), Compression::default());

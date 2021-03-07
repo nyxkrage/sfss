@@ -24,6 +24,7 @@ struct AppContext {
     label: String,
     webroot: String,
     url: String,
+    languages: Vec<String>,
 }
 
 lazy_static::lazy_static! {
@@ -34,6 +35,7 @@ lazy_static::lazy_static! {
             label: std::env::var("SFSS_LABEL").unwrap(),
             webroot: std::env::var("SFSS_ROOT").unwrap(),
             url: std::env::var("SFSS_URL").unwrap(),
+            languages: serde_json::from_str(include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/languages.json"))).unwrap(),
         }
     };
 }
@@ -111,6 +113,16 @@ fn root() -> Result<Html<String>, Status> {
     }
 }
 
+#[get("/hljs.js")]
+fn hljs() -> &'static str {
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/highlight.js"))
+}
+
+#[get("/style.css")]
+fn style() -> &'static str {
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/style.css"))
+}
+
 #[get("/favicon.ico")]
 fn favicon() -> Status {
     Status::NotFound
@@ -120,5 +132,5 @@ fn favicon() -> Status {
 #[launch]
 async fn rocket() -> rocket::Rocket {
     dotenv::dotenv().ok();
-    rocket::ignite().mount("/", routes![file, upload, api_upload, root, favicon])
+    rocket::ignite().mount("/", routes![file, upload, api_upload, root, favicon, style, hljs])
 }
