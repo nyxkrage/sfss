@@ -349,7 +349,7 @@ impl<'r> Responder<'r, 'static> for SfssFile {
         if let FileType::Code(id) = self.filetype {
             let content = String::from_utf8_lossy(&self.buf);
             let ctx = CodeContext {
-                hljsclass: highlightjs::from_id(id as usize).unwrap(),
+                hljsclass: highlightjs_rs::from_id(id as usize).unwrap(),
                 content: content.to_string(),
             };
             if let Ok(v) = handlebars::Handlebars::new().render_template(crate::sfss_templates::CODE, &ctx) {
@@ -423,7 +423,7 @@ impl FromData for SfssFile {
         let mut sfss_file = SfssFile::create("".into(), false, false, false);
         let mut written = false;
 
-        use highlightjs::{exact, to_id};
+        use highlightjs_rs::{exact, to_id};
         let mut langid = None;
         
         // Custom implementation parts

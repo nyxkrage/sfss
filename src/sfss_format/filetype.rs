@@ -43,7 +43,7 @@ impl FileType {
     // TODO: make concrete error enum to use in results
     pub fn to_hljs(&self) -> Option<&'static str> {
         if let FileType::Code(i) = self {
-            highlightjs::from_id(*i as usize)
+            highlightjs_rs::from_id(*i as usize)
         } else {
             None
         }

@@ -19,7 +19,7 @@ byteorder = "1.4.2"
 handlebars = "3.5.3"
 multipart = { version = "0.17.1", default-features = false, features = ["server"] }
 serde_json = "1.0.64"
-highlightjs = { git = "https://github.com/nyxiative/highlightjs-rs" }
+highlightjs-rs = { git = "https://github.com/nyxiative/highlightjs-rs" }
 
 [dev-dependencies]
 tempdir = "0.3.7"
