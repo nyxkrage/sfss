@@ -1,6 +1,6 @@
 [package]
 name = "sfss"
-version = "2.1.0"
+version = "2.3.0"
 authors = ["Carsten Kragelund <carsten@kragelund.dev>"]
 edition = "2018"
 

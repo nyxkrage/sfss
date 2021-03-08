@@ -1,5 +1,7 @@
-pub mod sfss_format;
-pub mod sfss_templates;
+mod sfss_format;
+mod sfss_templates;
+#[macro_use]
+mod utils;
 
 #[macro_use]
 extern crate rocket;
@@ -35,25 +37,20 @@ lazy_static::lazy_static! {
             label: std::env::var("SFSS_LABEL").unwrap(),
             webroot: std::env::var("SFSS_ROOT").unwrap(),
             url: std::env::var("SFSS_URL").unwrap(),
-            languages: serde_json::from_str(include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/languages.json"))).unwrap(),
+            languages: serde_json::from_str(include_base_str!("resources/languages.json")).unwrap(),
         }
     };
 }
 
-#[post("/upload", data = "<data>")]
-async fn upload(data: SfssFile) -> Result<Html<String>, Status> {
-    let template = if data.password.is_some() {
-        sfss_templates::UPLOAD_PASSWORD
-    } else {
-        sfss_templates::UPLOAD
-    };
+fn upload(data: SfssFile, api: bool) -> Result<Html<String>, Status> {
+    let passworded = data.password.is_some();
     let ctx = Context {
         code: data.hash, //sfss_file.hash,
         url: APP_CONTEXT.url.clone(),
         webroot: APP_CONTEXT.webroot.clone(),
         password: data.password,
     };
-    match handlebars::Handlebars::new().render_template(template, &ctx) {
+    match handlebars::Handlebars::new().render_template(sfss_templates::get_template(api, passworded), &ctx) {
         Ok(v) => Ok(Html(v)),
         Err(e) => {
             eprintln!("{:?}", e);
@@ -62,26 +59,14 @@ async fn upload(data: SfssFile) -> Result<Html<String>, Status> {
     }
 }
 
+#[post("/upload", data = "<data>")]
+fn upload_web(data: SfssFile) -> Result<Html<String>, Status> {
+    upload(data, false)
+}
+
 #[post("/upload/api", data = "<data>")]
-fn api_upload(data: SfssFile) -> Result<String, Status> {
-    let template = if data.password.is_some() {
-        sfss_templates::UPLOAD_API_PASSWORD
-    } else {
-        sfss_templates::UPLOAD_API
-    };
-    let ctx = Context {
-        code: data.hash, //sfss_file.hash,
-        url: APP_CONTEXT.url.clone(),
-        webroot: APP_CONTEXT.webroot.clone(),
-        password: data.password,
-    };
-    match handlebars::Handlebars::new().render_template(template, &ctx) {
-        Ok(v) => Ok(v),
-        Err(e) => {
-            eprintln!("{:?}", e);
-            Err(Status::InternalServerError)
-        }
-    }
+fn upload_api(data: SfssFile) -> Result<Html<String>, Status> {
+    upload(data, true)
 }
 
 #[get("/<code>/raw?<password>")]
@@ -136,5 +121,5 @@ fn favicon() -> Status {
 #[launch]
 async fn rocket() -> rocket::Rocket {
     dotenv::dotenv().ok();
-    rocket::ignite().mount("/", routes![file, raw, upload, api_upload, root, favicon, style, hljs])
+    rocket::ignite().mount("/", routes![file, raw, upload_api, upload_web, root, favicon, style, hljs])
 }
