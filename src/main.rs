@@ -84,6 +84,10 @@ fn api_upload(data: SfssFile) -> Result<String, Status> {
     }
 }
 
+#[get("/<code>/raw?<password>")]
+fn raw(code: String, password: Option<String>) -> Result<SfssFile, Status> {
+    file(code, password)
+}
 #[get("/<code>?<password>")]
 fn file(code: String, password: Option<String>) -> Result<SfssFile, Status> {
     match SfssFile::new(code.clone(), false) {
@@ -132,5 +136,5 @@ fn favicon() -> Status {
 #[launch]
 async fn rocket() -> rocket::Rocket {
     dotenv::dotenv().ok();
-    rocket::ignite().mount("/", routes![file, upload, api_upload, root, favicon, style, hljs])
+    rocket::ignite().mount("/", routes![file, raw, upload, api_upload, root, favicon, style, hljs])
 }

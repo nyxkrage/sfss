@@ -333,7 +333,7 @@ use rocket::response::Result as responseResult;
 use rocket::{
     http::{Header, Status},
     response::Responder,
-    Request, Response,
+    Request, Response
 };
 
 #[derive(Serialize)]
@@ -343,56 +343,40 @@ struct CodeContext {
 }
 
 impl<'r> Responder<'r, 'static> for SfssFile {
-    fn respond_to(mut self, _: &'r Request<'_>) -> responseResult<'static> {
+    fn respond_to(mut self, req: &'r Request<'_>) -> responseResult<'static> {
         self.decompress().unwrap();
-        // This can likely be reduced by a ton
-        if let FileType::Code(id) = self.filetype {
-            let content = String::from_utf8_lossy(&self.buf);
-            let ctx = CodeContext {
-                hljsclass: highlightjs_rs::from_id(id as usize).unwrap(),
-                content: content.to_string(),
-            };
-            if let Ok(v) = handlebars::Handlebars::new().render_template(crate::sfss_templates::CODE, &ctx) {
-                Response::build()
-                    .header(self.content_type())
-                    .sized_body(v.len(), Cursor::new(v))
-                    .header(Header::new("Cache-Control", "max-age=31536000"))
-                    .header(Header::new(
-                        "Content-Disposition",
-                        format!(
-                            "{}; filename=\"{}\"",
-                            if self.flags.no_preview {
-                                "attachment"
-                            } else {
-                                "inline"
-                            },
-                            self.filename
-                        )
-                    ))
-                    .ok()
-            } else {
-                Response::build().status(Status::InternalServerError).ok()
+        let mut resp = Response::build();
+        resp
+            .header(self.content_type())
+            .header(Header::new("Cache-Control", "max-age=31536000"))
+            .header(Header::new(
+                "Content-Disposition",
+                format!(
+                    "{}; filename=\"{}\"",
+                    if self.flags.no_preview {
+                        "attachment"
+                    } else {
+                        "inline"
+                    },
+                    self.filename
+                )
+            ));
+        // I would use path_segments().last but alas not working
+        if req.uri().path().rsplit('/').next().unwrap() != "raw" {
+            if let FileType::Code(id) = self.filetype {
+                let content = String::from_utf8_lossy(&self.buf);
+                let ctx = CodeContext {
+                    hljsclass: highlightjs_rs::from_id(id as usize).unwrap(),
+                    content: content.to_string(),
+                };
+                return if let Ok(v) = handlebars::Handlebars::new().render_template(crate::sfss_templates::CODE, &ctx) {
+                    resp.sized_body(v.len(), Cursor::new(v)).ok()
+                } else {
+                    Response::build().status(Status::InternalServerError).ok()
+                };
             }
-        } else {
-            Response::build()
-                .header(self.content_type())
-                .status(Status::Ok)
-                .sized_body(self.buf.len(), Cursor::new(self.buf))
-                .header(Header::new("Cache-Control", "max-age=31536000"))
-                .header(Header::new(
-                    "Content-Disposition",
-                    format!(
-                        "{}; filename=\"{}\"",
-                        if self.flags.no_preview {
-                            "attachment"
-                        } else {
-                            "inline"
-                        },
-                        self.filename
-                    ),
-                ))
-                .ok()
         }
+        resp.sized_body(self.buf.len(), Cursor::new(self.buf)).ok()
     }
 }
 
