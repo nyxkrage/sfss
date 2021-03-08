@@ -13,7 +13,11 @@
 			<label for="language">Language for code</label>
 			<select name="language">
 				{{#each languages}}
+				{{#if (eq this "Plain text")}}
+				<option selected value={{this}}>{{this}}</option>
+				{{else}}
 				<option value={{this}}>{{this}}</option>
+				{{/if}}
 				{{/each}}
 			</select>
 
