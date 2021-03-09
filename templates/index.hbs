@@ -6,7 +6,7 @@
 		<meta name="description" content="Simple FileSharing Service">
 		<meta name="author" content="Nyxiative">
 	</head>
-	<body>
+	<body ondragstart="dragStartHandler(event);" ondrop="dropHandler(event);" ondragover="dragOverHandler(event);">
 		<form action="{{webroot}}/upload" method="post" enctype="multipart/form-data">
 			<h1>NyxShare</h1>
 			<p>This is a site for sharing files or code/text snippets.</p>
@@ -49,11 +49,22 @@
 			<a href="https://twitch.tv/togglebit">ToggleBit</a><span> for advertising this site on his twitch page</span>
 		</form>
 		<script>
-			document.body.addEventListener('drop', (e) => {
-				document.getElementById("file").files = e.dataTransfer.files
-				e.preventDefault()
-				e.stopPropagation()
-			}, false);
+			function dragStartHandler(ev) {
+				// Prevent default behavior (Prevent file from being opened)
+				ev.preventDefault();
+				ev.dataTransfer.setData("text", "mydata"); // Needed by Firefox
+			}
+			function dragOverHandler(ev) {
+				// Prevent default behavior (Prevent file from being opened)
+				ev.preventDefault();
+			}
+
+			function dropHandler(ev) {
+				// Prevent default behavior (Prevent file from being opened)
+				ev.preventDefault();
+
+				document.getElementById("file").files = ev.dataTransfer.files;
+			}
 		</script>
 	</body>
 </html>
