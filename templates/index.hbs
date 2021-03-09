@@ -48,5 +48,12 @@
 			<h2>Cool people</h2>
 			<a href="https://twitch.tv/togglebit">ToggleBit</a><span> for advertising this site on his twitch page</span>
 		</form>
+		<script>
+			document.body.addEventListener('drop', (e) => {
+				document.getElementById("file").files = e.dataTransfer.files
+				e.preventDefault()
+				e.stopPropagation()
+			}, false);
+		</script>
 	</body>
 </html>
