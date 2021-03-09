@@ -117,9 +117,18 @@ fn favicon() -> Status {
     Status::NotFound
 }
 
+#[get("/robots.txt")]
+fn robots() -> &'static str {
+    r#"
+    user-agent: *
+    Allow: /$
+    Disallow: /
+    "#
+}
+
 // The launch attribute, tells that this is the entry point for the application
 #[launch]
 async fn rocket() -> rocket::Rocket {
     dotenv::dotenv().ok();
-    rocket::ignite().mount("/", routes![file, raw, upload_api, upload_web, root, favicon, style, hljs])
+    rocket::ignite().mount("/", routes![file, raw, upload_api, upload_web, root, favicon, style, hljs, robots])
 }
