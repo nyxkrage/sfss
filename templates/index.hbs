@@ -8,9 +8,20 @@
 	</head>
 	<body>
 		<form action="{{webroot}}/upload" method="post" enctype="multipart/form-data">
-            <textarea maxlength="128000000" cols="120" rows="14" name="file" onchange="document.getElementById('file').value = ''" id="textFile" placeholder="Enter text to upload here"></textarea><br />
+			<h1>NyxShare</h1>
+			<p>This is a site for sharing files or code/text snippets.</p>
+			<p>Paste your code in the textbox or upload a file, choose the language if you're uploading code. 
+			You'll get back an easy-shareable sharable link.</p>
+			<p>You can upload files with curl to the url <code>https://share.nyx.xyz/upload/api</code> with the 
+			parameters <code>file</code>, containing either the content or the file, and then <code>public</code>, 
+			<code>protected</code>, and <code>no_preview</code> all set to either true or false, and finally 
+			the <code>language</code> field, set to one of the options in the dropdown</p>
+			<p>You can view code snippets without syntax highlighting by added <code>/raw</code> after the hash
+			in the url.</p>
+			<textarea maxlength="128000000" cols="120" rows="14" name="file" onkeydown="document.getElementById('file').value = ''" id="textFile" placeholder="Enter text to upload here"></textarea><br />
+			<label for="file">Or upload a file</label>
 			<input type="file" name="file" id="file" onchange="document.getElementById('textFile').value = ''" />
-			<label for="language">Language for code</label>
+			<label for="language">Language for code highlighting</label>
 			<select name="language">
 				{{#each languages}}
 				{{#if (eq this "Plain text")}}
@@ -20,7 +31,6 @@
 				{{/if}}
 				{{/each}}
 			</select>
-
 			<br />
 			<input type="checkbox" name="public" checked />
 			<label for="public">Public File?</label><br />
@@ -31,7 +41,12 @@
 			<input type="checkbox" name="no_preview" />
 			<label for="no_preview">Disable Preview?</label>
 			<span>Should people be able to preview the file (View PDF/Image/Audio... in the browser), this doesn't affect non-previewable files anyway</span><br /><br />
-			<input type="submit" value="Submit" />
+			<input type="submit" value="Submit" /><br />
+			<h2>Links</h2>
+			<a href="https://github.com/nyxiative/sfss">Star the project on Github</a><br />
+			<a href="https://discordapp.com/users/233967347763904522">Discord @ Nyxiative#1337</a>
+			<h2>Cool people</h2>
+			<a href="https://twitch.tv/togglebit">ToggleBit</a><span> for advertising this site on his twitch page</span>
 		</form>
 	</body>
 </html>
