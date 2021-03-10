@@ -365,10 +365,16 @@ impl<'r> Responder<'r, 'static> for SfssFile {
         // I would use path_segments().last but alas not working
         if req.uri().path().rsplit('/').next().unwrap() != "raw" {
             if let FileType::Code(id) = self.filetype {
+                use std::os::unix::net::UnixStream;
+                let lang = highlightjs_rs::from_id(id as usize).unwrap();
                 let content = String::from_utf8_lossy(&self.buf);
+                let mut stream = UnixStream::connect("/tmp/sfss.sock").expect("HighlightJS server isnt running");
+                write!(stream, "{}:{}", lang, content).unwrap();
+                let mut response = String::new();
+                stream.read_to_string(&mut response).unwrap();
                 let ctx = CodeContext {
-                    hljsclass: highlightjs_rs::from_id(id as usize).unwrap(),
-                    content: content.to_string(),
+                    hljsclass: lang,
+                    content: response,
                 };
                 return if let Ok(v) = handlebars::Handlebars::new().render_template(crate::sfss_templates::CODE, &ctx) {
                     resp.sized_body(v.len(), Cursor::new(v)).ok()
@@ -415,12 +421,9 @@ impl FromData for SfssFile {
         mp.foreach_entry(|mut entry| match &*entry.headers.name {
             "language" => {
                 let mut s = String::new();
-                dbg!(&entry.is_text());
                 if entry.is_text() {
                     entry.data.read_to_string(&mut s).unwrap();
-                    dbg!(&s);
                     if let Some(m) = exact(&s) {
-                        dbg!(&m);
                         if m != "plaintext" {
                             langid =to_id(m);
                         }
@@ -455,7 +458,6 @@ impl FromData for SfssFile {
         })
         .expect("Unable to iterate");
          
-        dbg!(&langid);
         if let Some(id) = langid {
             if sfss_file.filetype == FileType::Text {
                 sfss_file.filetype = FileType::Code(id as u32);

@@ -1,5 +1,9 @@
 version: '3.3'
 services:
+    hljs-server:
+        volumes:
+            - '/var/run/sfss:/var/run/sfss'
+        image: hljs-server
     sfss:
         ports:
             - '8000:8000'
