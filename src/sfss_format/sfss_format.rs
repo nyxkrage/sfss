@@ -368,7 +368,7 @@ impl<'r> Responder<'r, 'static> for SfssFile {
                 use std::os::unix::net::UnixStream;
                 let lang = highlightjs_rs::from_id(id as usize).unwrap();
                 let content = String::from_utf8_lossy(&self.buf);
-                let mut stream = UnixStream::connect("/tmp/sfss.sock").expect("HighlightJS server isnt running");
+                let mut stream = UnixStream::connect("/tmp/sfss/sfss.sock").expect("HighlightJS server isnt running");
                 write!(stream, "{}:{}", lang, content).unwrap();
                 let mut response = String::new();
                 stream.read_to_string(&mut response).unwrap();

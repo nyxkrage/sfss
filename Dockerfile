@@ -29,13 +29,14 @@ RUN cargo build --release
 
 FROM debian:buster-slim
 
-RUN adduser --shell /bin/sh --uid 1024 sfss
+RUN useradd --shell /bin/sh --uid 1024 sfss
 
 RUN apt-get update
 RUN apt-get install libclang-dev libxxhash-dev -y
 
 WORKDIR /home/sfss/bin/
 RUN mkdir -p /var/sfss && chown sfss:sfss /var/sfss
+RUN mkdir -p /tmp/sfss && chown sfss:sfss /tmp/sfss
 COPY --from=cargo-build /usr/src/sfss/target/release/sfss .
 
 RUN chown sfss:sfss sfss

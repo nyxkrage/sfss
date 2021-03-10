@@ -2,13 +2,14 @@ version: '3.3'
 services:
     hljs-server:
         volumes:
-            - '/var/run/sfss:/var/run/sfss'
+            - '/var/run/sfss:/tmp/sfss'
         image: hljs-server
     sfss:
         ports:
             - '8000:8000'
         volumes:
             - '/var/sfss:/var/sfss'
+            - '/var/run/sfss:/tmp/sfss'
         environment:
             - 'ROCKET_ADDRESS=0.0.0.0'
             - 'SFSS_LOCATION=/var/sfss'
