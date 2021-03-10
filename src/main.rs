@@ -130,5 +130,11 @@ fn robots() -> &'static str {
 #[launch]
 async fn rocket() -> rocket::Rocket {
     dotenv::dotenv().ok();
-    rocket::ignite().mount("/", routes![file, raw, upload_api, upload_web, root, favicon, style, hljs, robots])
+    rocket::ignite()
+        .mount("/", routes![file, raw, upload_api, upload_web, root, favicon, style, hljs, robots])
+        .attach(rocket::fairing::AdHoc::on_response("Allow CORS", |_, res| {
+            Box::pin(async move {
+                res.adjoin_raw_header("Access-Control-Allow-Origin","*");
+            })
+        }))
 }

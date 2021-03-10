@@ -349,7 +349,6 @@ impl<'r> Responder<'r, 'static> for SfssFile {
         resp
             .header(self.content_type())
             .header(Header::new("Cache-Control", "max-age=31536000"))
-            .header(Header::new("Access-Control-Allow-Origin", "*"))
             .header(Header::new(
                 "Content-Disposition",
                 format!(
