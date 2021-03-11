@@ -7,7 +7,7 @@ mod utils;
 extern crate rocket;
 extern crate lazy_static;
 
-use rocket::{http::Status, response::content::Html};
+use rocket::{http::Status, response::content::{Html, Json}};
 
 use serde::{Deserialize, Serialize};
 use sfss_format::SfssFile;
@@ -37,7 +37,7 @@ lazy_static::lazy_static! {
             label: std::env::var("SFSS_LABEL").unwrap(),
             webroot: std::env::var("SFSS_ROOT").unwrap(),
             url: std::env::var("SFSS_URL").unwrap(),
-            languages: serde_json::from_str(include_base_str!("resources/languages.json")).unwrap(),
+            languages: serde_json::from_str(highlightjs_rs::LANGSJSON).unwrap(),
         }
     };
 }
@@ -67,6 +67,15 @@ fn upload_web(data: SfssFile) -> Result<Html<String>, Status> {
 #[post("/upload/api", data = "<data>")]
 fn upload_api(data: SfssFile) -> Result<Html<String>, Status> {
     upload(data, true)
+}
+
+#[post("/upload/api?json", data = "<data>")]
+fn upload_json(data: SfssFile) -> Result<Json<String>, Status> {
+    if let Some(password) = data.password {
+        Ok(Json(format!("{{\"hash\": \"{}\", \"password\": \"{}\"}}", data.hash, password).to_owned()))
+    } else {
+        Ok(Json(format!("{{\"hash\": \"{}\", \"password\": null}}", data.hash).to_owned()))
+    }
 }
 
 #[get("/<code>/raw?<password>")]
@@ -126,12 +135,22 @@ fn robots() -> &'static str {
     "#
 }
 
+#[get("/languages")]
+fn langs() -> Json<&'static str> {
+    Json(highlightjs_rs::LANGSJSON)
+}
+
+#[get("/languages/api")]
+fn langs_api() -> &'static str {
+    highlightjs_rs::CLASSRAW
+}
+
 // The launch attribute, tells that this is the entry point for the application
 #[launch]
 async fn rocket() -> rocket::Rocket {
     dotenv::dotenv().ok();
     rocket::ignite()
-        .mount("/", routes![file, raw, upload_api, upload_web, root, favicon, style, hljs, robots])
+        .mount("/", routes![file, raw, upload_api, upload_json, upload_web, root, favicon, style, hljs, robots, langs, langs_api])
         .attach(rocket::fairing::AdHoc::on_response("Allow CORS", |_, res| {
             Box::pin(async move {
                 res.adjoin_raw_header("Access-Control-Allow-Origin","*");

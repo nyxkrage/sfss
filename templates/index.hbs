@@ -15,9 +15,9 @@
 			You'll get back an easy-shareable sharable link.</p>
 			<p>You can upload files with curl to the url <code>https://share.nyx.xyz/upload/api</code> with the 
 			parameters <code>file</code>, containing either the content or the file, and then <code>public</code>, 
-			<code>protected</code>, and <code>no_preview</code> all set to either true or false, and finally 
-			the <code>language</code> field, set to one of the options in the dropdown</p>
-			<p>You can view code snippets without syntax highlighting by added <code>/raw</code> after the hash
+			<code>protected</code>, and <code>no_preview</code> based on what flags you want, and finally 
+			the <code>language</code> field, set to one of the values found on the <code>/languages/api</code> endpoint</p>
+			<p>You can view code snippets without syntax highlighting by adding <code>/raw</code> after the hash
 			in the url.</p>
 			<textarea aria-label="Text input for upload" maxlength="128000000" cols="120" rows="14" name="file" onkeydown="document.getElementById('file').value = ''" id="textFile" placeholder="Enter text to upload here"></textarea><br />
 			<label for="file">Or upload a file</label>
@@ -48,6 +48,7 @@
 			<a href="https://discordapp.com/users/233967347763904522">Discord @ Nyxiative#1337</a>
 			<h2>Cool people</h2>
 			<a href="https://twitch.tv/togglebit">ToggleBit</a><span> for advertising this site on his twitch page</span>
+			<a href="https://twitch.tv/klassykat">KlassyKat</a><span> for advertising this site on his twitch page</span>
 		</form>
 		<script>
 			function dragStartHandler(ev) {

@@ -417,14 +417,21 @@ impl FromData for SfssFile {
         let mut langid = None;
         
         // Custom implementation parts
-        mp.foreach_entry(|mut entry| match &*entry.headers.name {
+        mp.foreach_entry(|mut entry| { match &*entry.headers.name {
             "language" => {
-                let mut s = String::new();
                 if entry.is_text() {
+                    let mut s = String::new();
                     entry.data.read_to_string(&mut s).unwrap();
-                    if let Some(m) = exact(&s) {
-                        if m != "plaintext" {
-                            langid =to_id(m);
+                    if request.uri().segments().last() == Some("api") {
+                            if s != "plaintext" {
+                                langid =to_id(s.as_ref());
+                            }
+                        }
+                    if langid == None {
+                        if let Some(m) = exact(&s) {
+                            if m != "plaintext" {
+                                langid =to_id(m);
+                            }
                         }
                     }
                 }
@@ -454,7 +461,7 @@ impl FromData for SfssFile {
                 }
             }
             _ => (),
-        })
+        }})
         .expect("Unable to iterate");
          
         if let Some(id) = langid {
@@ -462,7 +469,6 @@ impl FromData for SfssFile {
                 sfss_file.filetype = FileType::Code(id as u32);
             }
         };
-
         if let Err(err) = sfss_file.flush() {
             if err.kind() == IoErrorKind::AlreadyExists {
                 let existing = SfssFile::new(sfss_file.hash.clone(), true).unwrap();
