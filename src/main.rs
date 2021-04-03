@@ -1,3 +1,4 @@
+mod context;
 mod sfss_format;
 mod sfss_templates;
 #[macro_use]
@@ -7,27 +8,13 @@ mod utils;
 extern crate rocket;
 extern crate lazy_static;
 
-use rocket::{http::Status, response::content::{Html, Json}};
+use rocket::{
+    http::Status,
+    response::content::{Html, Json},
+};
 
-use serde::{Deserialize, Serialize};
+use context::{AppContext, PageContext};
 use sfss_format::SfssFile;
-
-#[derive(Serialize, Deserialize)]
-struct Context {
-    code: String,
-    url: String,
-    webroot: String,
-    password: Option<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct AppContext {
-    title: String,
-    label: String,
-    webroot: String,
-    url: String,
-    languages: Vec<String>,
-}
 
 lazy_static::lazy_static! {
     static ref APP_CONTEXT: AppContext = {
@@ -44,13 +31,15 @@ lazy_static::lazy_static! {
 
 fn upload(data: SfssFile, api: bool) -> Result<Html<String>, Status> {
     let passworded = data.password.is_some();
-    let ctx = Context {
+    let ctx = PageContext {
         code: data.hash, //sfss_file.hash,
         url: APP_CONTEXT.url.clone(),
         webroot: APP_CONTEXT.webroot.clone(),
         password: data.password,
     };
-    match handlebars::Handlebars::new().render_template(sfss_templates::get_template(api, passworded), &ctx) {
+    match handlebars::Handlebars::new()
+        .render_template(sfss_templates::get_template(api, passworded), &ctx)
+    {
         Ok(v) => Ok(Html(v)),
         Err(e) => {
             eprintln!("{:?}", e);
@@ -72,9 +61,17 @@ fn upload_api(data: SfssFile) -> Result<Html<String>, Status> {
 #[post("/upload/api?json", data = "<data>")]
 fn upload_json(data: SfssFile) -> Result<Json<String>, Status> {
     if let Some(password) = data.password {
-        Ok(Json(format!("{{\"hash\": \"{}\", \"password\": \"{}\"}}", data.hash, password).to_owned()))
+        Ok(Json(
+            format!(
+                "{{\"hash\": \"{}\", \"password\": \"{}\"}}",
+                data.hash, password
+            )
+            .to_owned(),
+        ))
     } else {
-        Ok(Json(format!("{{\"hash\": \"{}\", \"password\": null}}", data.hash).to_owned()))
+        Ok(Json(
+            format!("{{\"hash\": \"{}\", \"password\": null}}", data.hash).to_owned(),
+        ))
     }
 }
 
@@ -113,7 +110,10 @@ fn root() -> Result<Html<String>, Status> {
 
 #[get("/hljs.js")]
 fn hljs() -> &'static str {
-    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/highlight.js"))
+    include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/resources/highlight.js"
+    ))
 }
 
 #[get("/style.css")]
@@ -150,10 +150,29 @@ fn langs_api() -> &'static str {
 async fn rocket() -> rocket::Rocket {
     dotenv::dotenv().ok();
     rocket::ignite()
-        .mount("/", routes![file, raw, upload_api, upload_json, upload_web, root, favicon, style, hljs, robots, langs, langs_api])
-        .attach(rocket::fairing::AdHoc::on_response("Allow CORS", |_, res| {
-            Box::pin(async move {
-                res.adjoin_raw_header("Access-Control-Allow-Origin","*");
-            })
-        }))
+        .mount(
+            "/",
+            routes![
+                file,
+                raw,
+                upload_api,
+                upload_json,
+                upload_web,
+                root,
+                favicon,
+                style,
+                hljs,
+                robots,
+                langs,
+                langs_api
+            ],
+        )
+        .attach(rocket::fairing::AdHoc::on_response(
+            "Allow CORS",
+            |_, res| {
+                Box::pin(async move {
+                    res.adjoin_raw_header("Access-Control-Allow-Origin", "*");
+                })
+            },
+        ))
 }

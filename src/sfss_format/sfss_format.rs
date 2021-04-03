@@ -1,14 +1,16 @@
-use crate::sfss_format::filetype::{FileType, BinaryType};
-
-use core::panic;
-use std::{fs::File, io::Cursor};
-
-use byteorder::{ByteOrder, LE};
+use std::fs::File;
 use std::io::Error as IoError;
 use std::io::ErrorKind as IoErrorKind;
 use std::io::Result as IoResult;
-use std::io::{BufReader, Read, Seek, SeekFrom, Write};
+use std::io::{BufReader, Cursor, Read, Seek, SeekFrom, Write};
 
+use crate::context::CodeContext;
+use crate::panic_dbg;
+use crate::sfss_format::fileflags::FileFlags;
+use crate::sfss_format::filetype::{BinaryType, FileType};
+use crate::utils::{bools_to_u8, u8_to_bools};
+
+use byteorder::{ByteOrder, LE};
 const MAGIC_BYTES: [u8; 6] = [53, 46, 53, 53, 253, 254];
 
 // FILE STRUCTURE:
@@ -19,52 +21,6 @@ const MAGIC_BYTES: [u8; 6] = [53, 46, 53, 53, 253, 254];
 // 8 bytes: PASSWORD
 // 1 bytes: FLAGS
 
-fn bools_to_u8(bools: [bool; 8]) -> u8 {
-    // true true false...
-    // 1100_0000
-    let mut res: u8 = 0;
-    for (i, b) in bools.iter().enumerate() {
-        res |= (*b as u8) << (7 - i)
-    }
-    res
-}
-
-fn u8_to_bools(byte: u8) -> [bool; 8] {
-    let mut res = [false; 8];
-    for (i, b) in res.iter_mut().enumerate() {
-        *b = byte & 1 << (7 - i) != 0;
-    }
-    res
-}
-
-use serde::{Deserialize, Serialize};
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct FileFlags {
-    pub public: bool,
-    pub protected: bool,
-    pub no_preview: bool,
-}
-
-impl Default for FileFlags {
-    fn default() -> Self {
-        Self {
-            public: true,
-            protected: false,
-            no_preview: false,
-        }
-    }
-}
-
-impl FileFlags {
-    fn from_iter<I: Iterator<Item = bool>>(iter: &mut I) -> Self {
-        Self {
-            public: iter.next().unwrap_or(false),
-            protected: iter.next().unwrap_or(false),
-            no_preview: iter.next().unwrap_or(false),
-        }
-    }
-}
-
 #[derive(PartialEq, Eq)]
 pub struct SfssFile {
     pub filename: String,
@@ -73,13 +29,31 @@ pub struct SfssFile {
     pub flags: FileFlags,
     pub password: Option<String>,
     pub file: std::path::PathBuf,
-    compressed: bool,
+    pub compressed: bool,
     buf: Vec<u8>,
 }
 
 impl std::fmt::Debug for SfssFile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{{\n\tFilename: {:?}\n\tHash: {:?}\n\tType: {:?}\n\tFlags: {:?}\n\tPassword: {:?}\n\tPath: {:?}\n\tCompressed {:?}\n}}", self.filename, self.hash, self.filetype, self.flags, self.password, self.file, self.compressed)
+        write!(
+            f,
+            r#"{{
+	Filename: {:?}
+	Hash: {:?}
+	Type: {:?}
+	Flags: {:?}
+	Password: {:?}
+	Path: {:?}
+	Compressed {:?}
+}}"#,
+            self.filename,
+            self.hash,
+            self.filetype,
+            self.flags,
+            self.password,
+            self.file,
+            self.compressed
+        )
     }
 }
 
@@ -333,21 +307,14 @@ use rocket::response::Result as responseResult;
 use rocket::{
     http::{Header, Status},
     response::Responder,
-    Request, Response
+    Request, Response,
 };
-
-#[derive(Serialize)]
-struct CodeContext {
-    hljsclass: &'static str,
-    content: String,
-}
 
 impl<'r> Responder<'r, 'static> for SfssFile {
     fn respond_to(mut self, req: &'r Request<'_>) -> responseResult<'static> {
         self.decompress().unwrap();
         let mut resp = Response::build();
-        resp
-            .header(self.content_type())
+        resp.header(self.content_type())
             .header(Header::new("Cache-Control", "max-age=31536000"))
             .header(Header::new(
                 "Content-Disposition",
@@ -359,7 +326,7 @@ impl<'r> Responder<'r, 'static> for SfssFile {
                         "inline"
                     },
                     self.filename
-                )
+                ),
             ));
         // I would use path_segments().last but alas not working
         if req.uri().path().rsplit('/').next().unwrap() != "raw" {
@@ -367,7 +334,8 @@ impl<'r> Responder<'r, 'static> for SfssFile {
                 use std::os::unix::net::UnixStream;
                 let lang = highlightjs_rs::from_id(id as usize).unwrap();
                 let content = String::from_utf8_lossy(&self.buf);
-                let mut stream = UnixStream::connect("/tmp/sfss/sfss.sock").expect("HighlightJS server isnt running");
+                let mut stream = UnixStream::connect("/tmp/sfss/sfss.sock")
+                    .expect("HighlightJS server isnt running");
                 write!(stream, "{}:{}", lang, content).unwrap();
                 let mut response = String::new();
                 stream.read_to_string(&mut response).unwrap();
@@ -375,7 +343,9 @@ impl<'r> Responder<'r, 'static> for SfssFile {
                     hljsclass: lang,
                     content: response,
                 };
-                return if let Ok(v) = handlebars::Handlebars::new().render_template(crate::sfss_templates::CODE, &ctx) {
+                return if let Ok(v) =
+                    handlebars::Handlebars::new().render_template(crate::sfss_templates::CODE, &ctx)
+                {
                     resp.sized_body(v.len(), Cursor::new(v)).ok()
                 } else {
                     Response::build().status(Status::InternalServerError).ok()
@@ -415,22 +385,22 @@ impl FromData for SfssFile {
 
         use highlightjs_rs::{exact, to_id};
         let mut langid = None;
-        
+
         // Custom implementation parts
-        mp.foreach_entry(|mut entry| { match &*entry.headers.name {
+        mp.foreach_entry(|mut entry| match &*entry.headers.name {
             "language" => {
                 if entry.is_text() {
                     let mut s = String::new();
                     entry.data.read_to_string(&mut s).unwrap();
                     if request.uri().segments().last() == Some("api") {
-                            if s != "plaintext" {
-                                langid =to_id(s.as_ref());
-                            }
+                        if s != "plaintext" {
+                            langid = to_id(s.as_ref());
                         }
+                    }
                     if langid == None {
                         if let Some(m) = exact(&s) {
                             if m != "plaintext" {
-                                langid =to_id(m);
+                                langid = to_id(m);
                             }
                         }
                     }
@@ -461,9 +431,9 @@ impl FromData for SfssFile {
                 }
             }
             _ => (),
-        }})
+        })
         .expect("Unable to iterate");
-         
+
         if let Some(id) = langid {
             if sfss_file.filetype == FileType::Text {
                 sfss_file.filetype = FileType::Code(id as u32);
@@ -484,74 +454,11 @@ impl FromData for SfssFile {
 
                 sfss_file.force_write().unwrap();
             } else {
-                dbg!(err);
-                panic!();
+                panic_dbg!(err);
             }
         }
 
         // End custom
         Outcome::Success(sfss_file)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn write_and_read_full() {
-        use std::io::Write;
-
-        let content = "File write and read test".as_bytes().to_vec();
-        let filename = "test.txt".to_string();
-        let tmp_dir = tempdir::TempDir::new("sfss").unwrap();
-        std::env::set_var("SFSS_LOCATION", tmp_dir.path());
-        dbg!(std::env::var("SFSS_LOCATION").unwrap());
-        let mut input = super::SfssFile::create(filename.clone(), true, true, false);
-
-        input.write_all(&content).unwrap();
-        assert_eq!(input.buf, content);
-        input.flush().unwrap();
-
-        let output = super::SfssFile::new(input.hash.clone(), false).unwrap();
-
-        assert_eq!(input, output);
-    }
-
-    #[test]
-    fn file_compress_decompress() {
-        use std::io::Write;
-
-        let content = b"File Compression and decompression test";
-        let filename = "".to_string();
-        let tmp_dir = tempdir::TempDir::new("sfss").unwrap();
-        std::env::set_var("SFSS_LOCATION", tmp_dir.path());
-        dbg!(std::env::var("SFSS_LOCATION").unwrap());
-        let mut input = super::SfssFile::create(filename.clone(), true, true, false);
-
-        input.write_all(content).unwrap();
-        assert_eq!(input.buf, content);
-        input.flush().unwrap();
-
-        input.decompress().unwrap();
-        assert_eq!(input.buf, content)
-    }
-
-    #[test]
-    fn compress_and_decompress() {
-        use flate2::read::ZlibDecoder;
-        use flate2::write::ZlibEncoder;
-        use flate2::Compression;
-        use std::io::Read;
-        use std::io::Write;
-
-        let content = "This is some plain text".as_bytes().to_vec();
-        let mut e = ZlibEncoder::new(Vec::new(), Compression::default());
-        e.write_all(&content).unwrap();
-        let compressed = e.finish().unwrap();
-
-        let mut z = ZlibDecoder::new(&compressed[..]);
-        let mut b = Vec::new();
-        z.read_to_end(&mut b).unwrap();
-
-        assert_eq!(content, b);
     }
 }
