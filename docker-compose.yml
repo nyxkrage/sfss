@@ -11,10 +11,10 @@ services:
             - '/var/sfss:/var/sfss'
             - '/var/run/sfss:/tmp/sfss'
         environment:
-            - 'ROCKET_ADDRESS=0.0.0.0'
+            - 'ROCKET_ADDRESS=127.0.0.1'
             - 'SFSS_LOCATION=/var/sfss'
             - 'SFSS_TITLE=NyxShare'
             - 'SFSS_LABEL=Choose file...'
             - 'SFSS_ROOT='
-            - 'SFSS_URL=https://share.nyx.xyz/'
+            - 'SFSS_URL=https://share.nyx.xyz'
         image: sfss

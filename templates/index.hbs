@@ -13,7 +13,7 @@
 			<p>This is a site for sharing files or code/text snippets.</p>
 			<p>Paste your code in the textbox or upload a file, choose the language if you're uploading code. 
 			You'll get back an easy-shareable sharable link.</p>
-			<p>You can upload files with curl to the url <code>https://share.nyx.xyz/upload/api</code> with the 
+			<p>You can upload files with curl to <code>/upload/api</code> with the 
 			parameters <code>file</code>, containing either the content or the file, and then <code>public</code>, 
 			<code>protected</code>, and <code>no_preview</code> based on what flags you want, and finally 
 			the <code>language</code> field, set to one of the values found on the <code>/languages/api</code> endpoint.</p>
@@ -25,7 +25,7 @@
 			<label for="language">Language for code highlighting</label>
 			<select name="language" id="language">
 				{{#each languages}}
-				{{#if (eq this "Plain text")}}
+				{{#if (eq this "Plaintext")}}
 				<option selected value={{this}}>{{this}}</option>
 				{{else}}
 				<option value={{this}}>{{this}}</option>
@@ -44,11 +44,8 @@
 			<span>Should people be able to preview the file (View PDF/Image/Audio... in the browser), this doesn't affect non-previewable files anyway</span><br /><br />
 			<input type="submit" value="Submit" /><br />
 			<h2>Links</h2>
-			<a href="https://github.com/nyxiative/sfss">Star the project on Github</a><br />
-			<a href="https://discordapp.com/users/233967347763904522">Discord @ Nyxiative#1337</a>
-			<h2>Cool people</h2>
-			<a href="https://twitch.tv/togglebit">ToggleBit</a><span> for advertising this site on his twitch page</span>
-			<a href="https://twitch.tv/klassykat">KlassyKat</a><span> for advertising this site on his twitch page</span>
+			<a href="https://github.com/nyxkrage/sfss">Star the project on Github</a><br />
+			<p>Discord @ NyxKrage#1337</p>
 		</form>
 		<script>
 			function dragStartHandler(ev) {
