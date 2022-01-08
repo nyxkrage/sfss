@@ -14,7 +14,7 @@ flate2 = { version = "1.0.20" }
 lazy_static = "1.4.0"
 dotenv = "0.15.0"
 passwords = "3.1.3"
-xxhrs = "2.0.0"
+xxhash-rust = { version = "0.8.2", features = ["xxh3"] }
 byteorder = "1.4.2"
 handlebars = "3.5.3"
 multipart = { version = "0.17.1", default-features = false, features = ["server"] }

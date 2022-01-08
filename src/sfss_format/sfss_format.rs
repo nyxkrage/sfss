@@ -257,7 +257,7 @@ impl SfssFile {
     }
 
     fn hash(&self) -> String {
-        base_62::encode(&xxhrs::XXH3_64::hash(&self.buf).to_le_bytes())
+        base_62::encode(&xxhash_rust::xxh3::xxh3_64(&self.buf).to_le_bytes())
     }
 }
 
